@@ -1,0 +1,49 @@
+# Secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Data lake: keep the folders, never the data
+data/**
+!data/*/
+!data/**/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tests and tooling
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Local engines and tool state
+*.duckdb
+*.duckdb.wal
+mlruns/
+mlartifacts/
+logs/
+airflow.db
+airflow.cfg
+.databricks/
+
+# Claude Code: per-user settings (project settings.json is shared)
+.claude/settings.local.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
