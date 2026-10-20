@@ -1,6 +1,6 @@
 # Spec: Bronze ingestion
 
-Status: **draft v2, awaiting approval** (2026-10-20)
+Status: **approved v3** (2026-10-20)
 
 ## Objective
 
@@ -70,7 +70,7 @@ These are explicit so Silver joins don't drift around midnight.
 
 **Weather archive settle lag = 5 days.** `ingest_weather_archive` raises `ValueError` if `end > today(UTC) − 5`. Source: ERA5 is "Daily with 5 days delay" per [Open-Meteo Historical Weather API docs](https://open-meteo.com/en/docs/historical-weather-api). Monthly backfill files and daily incremental files can overlap. That is allowed, and Silver resolves it (see the contract below).
 
-**Weather forecast timing.** The day-ahead auction closes at 12:00 CET/CEST. The snapshot runs at **10:00 Europe/Oslo**, which is always the same UTC date. `ingest_weather_forecast` raises `ValueError` if `day != today (UTC)` or if it is called at or after 12:00 Europe/Oslo. A late snapshot would carry information the price model couldn't have had, so this case fails loudly instead of being stored. A missed day stays missing until the Previous Runs backfill stage.
+**Weather forecast timing.** The day-ahead auction closes at 12:00 CET/CEST. The snapshot runs at **10:00 Europe/Oslo**, which is always the same UTC date. `ingest_weather_forecast` raises `ValueError` if `day != today (UTC)`. A run at or after 12:00 Europe/Oslo **still stores the snapshot and logs a warning**. Bronze records what the source returned. The 12:00 cutoff is a feature-availability rule, and it belongs to Gold (see contracts below). A missed day stays missing until the Previous Runs backfill stage.
 
 **NVE.** The requests take no date parameters, so the range comes from the response:
 - Weekly: `range_start`/`range_end` = the ISO week of `dato_Id`. Every `omrType == "EL"` row must share one `dato_Id`, otherwise the function raises. Because the range is unknown until the response arrives, the weekly call always makes 1 HTTP request (a small one) and then skips the write if that week is already committed.
@@ -107,7 +107,9 @@ From [open-meteo.com/en/pricing](https://open-meteo.com/en/pricing) and [open-me
 
 Prices: about 1,870 days × 5 areas ≈ **9,350 requests** (~80 min at 0.5 s). hvakosterstrommen publishes no rate limits (unverified). Because the backfill resumes for free, it can be split across sessions.
 
-## Contract for the next stage (Silver)
+## Contracts for later stages
+
+### Silver
 
 - **Overlapping ranges:** for each business key, Silver keeps the record from the file with the latest `ingested_at`. Business keys:
   - prices, weather archive: `price_area + timestamp_utc`
@@ -117,6 +119,10 @@ Prices: about 1,870 days × 5 areas ≈ **9,350 requests** (~80 min at 0.5 s). h
 - The price shape check (above) lives in Silver and fails the run loudly.
 - EUR is the primary price; NOK is provider-derived.
 - NVE values are forward-filled from the publish time (Wednesday 13:00 Oslo), not from `dato_Id` (see `docs/data-sources.md`).
+
+### Gold
+
+- **Forecast cutoff:** a forecast snapshot is a usable feature for delivery day D+1 only if its `ingested_at` is before 12:00 Europe/Oslo on day D, when the day-ahead auction closes. Gold drops later snapshots for that target, using `ingested_at` from the meta file. It doesn't use the partition date.
 
 ## Tech Stack
 
@@ -147,6 +153,7 @@ src/energy_platform/ingestion/
   bronze.py      USER_AGENT, http_get (retries), write_bronze (atomic, append-only), is_committed
   sources.py     the five ingest_* functions, AREAS / POINTS / PRICE_START constants
   __main__.py    argparse CLI: backfill, incremental
+.env.example     drop the HTTP_USER_AGENT line (same task that adds USER_AGENT)
 tests/
   fixtures/      one small real payload per endpoint, captured once by hand
   test_bronze.py writer + http behaviour
@@ -187,7 +194,7 @@ def ingest_prices(day: date, run_id: str, root: Path = BRONZE_ROOT) -> list[Path
   - price 404 writes nothing; empty list / non-JSON writes nothing
   - retry: 5xx then 200 succeeds, 3× 5xx raises, other 4xx raises immediately
   - archive with `end > today − 5` raises; backfill splits a range into calendar months, truncating the last one
-  - forecast with a past day, or at/after 12:00 Oslo, raises (clock injected)
+  - forecast with a past day raises; at/after 12:00 Oslo it writes and logs a warning (clock injected)
   - NVE weekly range = Monday → `dato_Id`; mixed `dato_Id`s raise
   - CLI: one failing request doesn't stop the range, exit code 1, summary counts
 - **Integration** (`@pytest.mark.integration`, excluded by default as already set up in `pyproject.toml`): one live fetch per source into `tmp_path`.
@@ -210,7 +217,7 @@ def ingest_prices(day: date, run_id: str, root: Path = BRONZE_ROOT) -> list[Path
 
 ## Known limitations
 
-- **Weather archive revisions aren't picked up.** Each archive request is made once and then skipped, so if Open-Meteo later revises a day (for example when ERA5 replaces model-filled values), Bronze keeps the first version. Whether the 5-day lag is enough to avoid revisions is unverified. The default `best_match` blends ERA5 with ECMWF IFS, which has no delay.
+- **Weather archive revisions aren't picked up (accepted for v1).** Each archive request is made once and then skipped, so Bronze keeps the first version of each day. Revisions come from the final reanalysis months later, so re-fetching only the last few days wouldn't catch them. If needed, a periodic re-fetch of older months fits the existing latest-wins rule (see Later stages).
 - **Prices are an hourly aggregation** of 15-minute market prices by a third party (see Price resolution assumption). They're fine for an hourly model, but they are not the official settlement price.
 - One weather point per price area (see `docs/data-sources.md`).
 
@@ -218,6 +225,7 @@ def ingest_prices(day: date, run_id: str, root: Path = BRONZE_ROOT) -> list[Path
 
 - **Forecast backfill via Open-Meteo [Previous Runs API](https://open-meteo.com/en/docs/previous-runs-api)** (most models from January 2024, fixed lead times `previous_day1..7`). The Historical Forecast API covers earlier years. This is planned, because training on archive actuals while predicting with forecasts is train/serve skew. It would also fill missed forecast days.
 - **Native 15-minute prices from ENTSO-E** (needs a token, XML).
+- **Periodic re-fetch of older weather archive months**, to pick up reanalysis revisions. The rule "Silver keeps the latest `ingested_at`" already handles the overlap.
 - Airflow DAG, Silver parsing/validation, `MinMaxMedian` reference data, multiple weather points per area, a run-log table.
 
 ## Attribution
@@ -226,6 +234,7 @@ The README must credit the data sources: **Open-Meteo** (CC BY 4.0, link to open
 
 ## Open Questions
 
-1. **`.env.example` still has `HTTP_USER_AGENT`.** It becomes unused once the User-Agent is a constant. Remove that line in the build step? (It's outside SPEC.md, so not done here.)
-2. **Late forecast runs.** Should a run at or after 12:00 Oslo raise (current spec) or store the snapshot with a warning and let Gold filter it on `ingested_at`? Raising keeps Bronze clean, but it loses the day.
-3. **Archive revisions.** Is the limitation acceptable for v1, or should incremental re-fetch the last N days, with Silver's latest-`ingested_at` rule already able to absorb the duplicates?
+None. Resolved 2026-10-20:
+- `.env.example`: the `HTTP_USER_AGENT` line is removed in the same build task that adds `USER_AGENT`.
+- Late forecast runs: the snapshot is stored with a warning, and Gold applies the cutoff.
+- Archive revisions: fetch once for v1; this is a known limitation.
