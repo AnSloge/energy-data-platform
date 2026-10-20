@@ -1,11 +1,42 @@
 """Bronze lake: one raw API response per file, committed by a meta sidecar written last."""
 
+import http.client
 import json
+import logging
 import os
+import time
+import urllib.error
+import urllib.request
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 BRONZE_ROOT = Path("data/bronze")
+USER_AGENT = "energy-data-platform/0.1 (+https://github.com/AnSloge/energy-data-platform)"
+
+log = logging.getLogger(__name__)
+
+
+def http_get(url: str, missing_ok: bool = False) -> bytes | None:
+    """GET `url`, retrying 5xx, 429, timeouts and connection errors after 1, 2 and 4 s.
+
+    A 404 returns None when `missing_ok`; any other 4xx raises at once.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    for delay in (1, 2, 4, None):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read()
+        except urllib.error.HTTPError as e:
+            if e.code == 404 and missing_ok:
+                return None
+            if delay is None or (e.code < 500 and e.code != 429):
+                raise
+        # HTTPException covers a body cut off mid-read (IncompleteRead)
+        except (urllib.error.URLError, http.client.HTTPException, TimeoutError, ConnectionError):
+            if delay is None:
+                raise
+        log.warning("GET %s failed, retrying in %d s", url, delay)
+        time.sleep(delay)
 
 
 def _paths(root: Path, source: str, name: str, start: date, end: date) -> tuple[Path, Path]:

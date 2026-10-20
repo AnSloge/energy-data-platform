@@ -1,4 +1,7 @@
+import http.client
+import io
 import json
+import urllib.error
 from datetime import UTC, date, datetime
 
 import pytest
@@ -72,3 +75,72 @@ def test_empty_payload_is_not_written(tmp_path):
     with pytest.raises(ValueError):
         write(tmp_path, rows=0)
     assert not any(tmp_path.rglob("*.json"))
+
+
+def fake_urlopen(monkeypatch, *outcomes):
+    """Each outcome is bytes (200 body) or an exception to raise, consumed in order."""
+    calls, sleeps = [], []
+
+    def urlopen(req, timeout):
+        calls.append((req, timeout))
+        outcome = outcomes[len(calls) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return io.BytesIO(outcome)
+
+    monkeypatch.setattr(bronze.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(bronze.time, "sleep", sleeps.append)
+    return calls, sleeps
+
+
+def http_error(code):
+    return urllib.error.HTTPError(URL, code, "err", {}, None)
+
+
+def test_http_get_sends_user_agent_and_timeout(monkeypatch):
+    calls, sleeps = fake_urlopen(monkeypatch, b"[1]")
+    assert bronze.http_get(URL) == b"[1]"
+    req, timeout = calls[0]
+    assert req.get_header("User-agent") == bronze.USER_AGENT
+    assert timeout == 30
+    assert sleeps == []
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        http_error(503),
+        http_error(429),
+        TimeoutError(),
+        urllib.error.URLError("refused"),
+        http.client.IncompleteRead(b""),
+    ],
+)
+def test_http_get_retries_transient_errors(monkeypatch, error):
+    calls, sleeps = fake_urlopen(monkeypatch, error, b"[1]")
+    assert bronze.http_get(URL) == b"[1]"
+    assert len(calls) == 2
+    assert sleeps == [1]
+
+
+def test_http_get_gives_up_after_three_retries(monkeypatch):
+    calls, sleeps = fake_urlopen(monkeypatch, *[http_error(500)] * 4)
+    with pytest.raises(urllib.error.HTTPError):
+        bronze.http_get(URL)
+    assert len(calls) == 4
+    assert sleeps == [1, 2, 4]
+
+
+@pytest.mark.parametrize("missing_ok", [False, True])
+def test_http_get_other_4xx_raises_at_once(monkeypatch, missing_ok):
+    calls, sleeps = fake_urlopen(monkeypatch, http_error(403))
+    with pytest.raises(urllib.error.HTTPError):
+        bronze.http_get(URL, missing_ok=missing_ok)
+    assert (len(calls), sleeps) == (1, [])
+
+
+def test_http_get_404(monkeypatch):
+    fake_urlopen(monkeypatch, http_error(404), http_error(404))
+    assert bronze.http_get(URL, missing_ok=True) is None
+    with pytest.raises(urllib.error.HTTPError):
+        bronze.http_get(URL)
