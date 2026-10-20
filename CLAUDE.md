@@ -5,6 +5,18 @@ Portfolio project: Energy Market Analytics & Forecasting Platform. It ingests No
 - Architecture, layer responsibilities and implementation order: `docs/project-idea-&-context.md`
 - Chosen APIs, endpoints and their quirks: `docs/data-sources.md`
 
+## Layout
+
+```
+src/energy_platform/   ingestion/ transformation/ quality/ ml/ serving/
+dags/                  Airflow DAGs
+notebooks/             Databricks notebooks
+dashboard/             Streamlit app
+tests/                 pytest
+data/                  local lake: bronze/ silver/ gold/ quarantine/ (contents gitignored)
+.github/workflows/     CI
+```
+
 ## Tooling (project-scoped plugins, see `.claude/settings.json`)
 
 - **agent-skills** (addyosmani): the development workflow. Work through `/spec` → `/plan` → `/build` → `/test` → `/agent-skills:review` → `/ship`. Write a spec before starting a new pipeline stage.
