@@ -5,6 +5,13 @@ Portfolio project: Energy Market Analytics & Forecasting Platform. It ingests No
 - Architecture, layer responsibilities and implementation order: `docs/project-idea-&-context.md`
 - Chosen APIs, endpoints and their quirks: `docs/data-sources.md`
 
+## Boundaries
+- Never call live APIs in unit tests; use fixtures in tests/fixtures/.
+- Ask before adding a dependency to pyproject.toml.
+- Don't modify docs/ or CLAUDE.md unless asked.
+- Don't refactor code outside the current task.
+- Never commit secrets; credentials go only in .env.
+
 ## Layout
 
 ```
@@ -29,3 +36,5 @@ data/                  local lake: bronze/ silver/ gold/ quarantine/ (contents g
 - Business key: `price_area + timestamp_utc`. Store all timestamps in UTC from Silver onward.
 - Secrets go in environment variables (`.env`, gitignored) and never in code.
 - Split time series chronologically. No random shuffles.
+
+
