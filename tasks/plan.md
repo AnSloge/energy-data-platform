@@ -33,8 +33,8 @@ The writer has no dependencies, so it comes first. Every source depends on the w
 - **Clock is a module-level `_now()` in `sources.py`**, returning `datetime.now(UTC)`. Tests monkeypatch it. This avoids adding a `now=` parameter to every public function.
 - **Tests stay offline.** Tests monkeypatch `sources.http_get` (and, for retry tests, `urllib.request.urlopen` and `time.sleep`). Fixtures are real payloads captured once by hand and trimmed where they are large (NVE history).
 - **Range loops live in the CLI.** These are per-day loops (prices, archive incremental) and per-month loops (archive backfill). The `ingest_*` functions take exactly one request's range, which is what an Airflow task will call later.
-- **Return value:** each `ingest_*` returns `{name: "written" | "skipped" | "missing"}`. This replaces the `list[Path]` in the spec's style snippet, because the CLI summary needs to tell these three cases apart.
-- **CLI error handling:** each `ingest_*` call is wrapped in try/except. Any exception, including `ValueError` for an empty or non-JSON body, counts as "failed". The loop continues and the run exits 1 at the end. A 404 is "missing" and doesn't fail the run. A source function never swallows its own errors.
+- **Return value:** each `ingest_*` returns `{name: "written" | "skipped" | "missing" | "failed"}`. This replaces the `list[Path]` in the spec's style snippet, because the CLI summary needs to tell these cases apart.
+- **CLI error handling:** each `ingest_*` call is wrapped in try/except. Any exception, including `ValueError` for an empty or non-JSON body, counts as "failed". The loop continues and the run exits 1 at the end. A 404 is "missing" and doesn't fail the run. A function that makes several requests (`ingest_prices`, one per area) catches errors per request, logs them and reports that name as "failed", so one bad area doesn't stop the others. It never hides an error without logging and reporting it.
 - **Lake root:** `BRONZE_ROOT = Path("data/bronze")`, overridable with a `root` argument or the CLI's `--root`. Lake contents are already ignored by `.gitignore` (`data/**`).
 - **Price resolution check lives in Silver**, as the approved spec says. Bronze commits the DST fixtures (23 and 25 rows) so that stage can reuse them.
 
@@ -42,8 +42,8 @@ The writer has no dependencies, so it comes first. Every source depends on the w
 
 ### Phase 1: Foundation + first vertical slice (prices)
 - [x] Task 1: Bronze writer with write-safety rules
-- [ ] Task 2: `http_get` + `ingest_prices` (one day, all areas)
-- [ ] Task 3: CLI `backfill` / `incremental` for prices + README attribution
+- [x] Task 2: `http_get` + `ingest_prices` (one day, all areas)
+- [x] Task 3: CLI `backfill` / `incremental` for prices + README attribution
 
 ### Checkpoint A: after Tasks 1–3
 - [ ] `ruff check . && pytest` green

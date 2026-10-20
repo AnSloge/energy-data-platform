@@ -12,6 +12,7 @@ from pathlib import Path
 
 BRONZE_ROOT = Path("data/bronze")
 USER_AGENT = "energy-data-platform/0.1 (+https://github.com/AnSloge/energy-data-platform)"
+POLITE_DELAY = 0.5  # seconds before every request, so free APIs never see a burst
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ def http_get(url: str, missing_ok: bool = False) -> bytes | None:
 
     A 404 returns None when `missing_ok`; any other 4xx raises at once.
     """
+    time.sleep(POLITE_DELAY)
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     for delay in (1, 2, 4, None):
         try:
