@@ -16,8 +16,8 @@ Verify command for every task: `ruff check . && pytest`
   - Size: S
   Additional checks: 
   - The lake folder should be gitignored
-  - Add price resolutoin check
-  - an empty non-JSON body should ocunt as "failed", not "missing"
+  - Add price resolution check
+  - an empty non-JSON body should count as "failed", not "missing"
 
 - [x] **Task 2: `http_get` + `ingest_prices`**
   - Adds `USER_AGENT`, `http_get(url, missing_ok=False) -> bytes | None` and `ingest_prices(day, run_id, root)`. Removes `HTTP_USER_AGENT` from `.env.example`.

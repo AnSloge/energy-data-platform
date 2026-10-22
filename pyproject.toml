@@ -5,6 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "energy-platform"
 version = "0.1.0"
+description = "Norwegian electricity price analytics and forecasting: Bronze → Silver → Gold, ML and a dashboard"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
