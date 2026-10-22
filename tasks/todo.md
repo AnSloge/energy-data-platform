@@ -5,7 +5,7 @@ Verify command for every task: `ruff check . && pytest`
 
 ## Phase 1: Foundation + prices
 
-- [ ] **Task 1: Bronze writer with write-safety rules**
+- [x] **Task 1: Bronze writer with write-safety rules**
   - Adds `write_bronze(root, source, name, start, end, body, run_id, url, rows) -> Path` and `is_committed(...)`.
   - Acceptance:
     - The path is `<root>/<source>/year=/month=/day=<start>/<name>_<start>_<end>.json`, with a byte-identical body and a meta file holding the 7 spec fields (`ingested_at` in UTC)
@@ -19,7 +19,7 @@ Verify command for every task: `ruff check . && pytest`
   - Add price resolutoin check
   - an empty non-JSON body should ocunt as "failed", not "missing"
 
-- [ ] **Task 2: `http_get` + `ingest_prices`**
+- [x] **Task 2: `http_get` + `ingest_prices`**
   - Adds `USER_AGENT`, `http_get(url, missing_ok=False) -> bytes | None` and `ingest_prices(day, run_id, root)`. Removes `HTTP_USER_AGENT` from `.env.example`.
   - Acceptance:
     - `http_get` uses a 30 s timeout and sends `USER_AGENT`. It retries 3 times with backoff 1/2/4 s on 5xx, 429, timeouts and connection errors. Any other 4xx raises at once. A 404 with `missing_ok` returns `None`.
@@ -30,7 +30,7 @@ Verify command for every task: `ruff check . && pytest`
   - Size: M
   - Depends on: 1
 
-- [ ] **Task 3: CLI for prices + README attribution**
+- [x] **Task 3: CLI for prices + README attribution**
   - Adds `python -m energy_platform.ingestion backfill|incremental --source prices [--start --end]`.
   - Acceptance:
     - Backfill loops over days (default start = earliest `PRICE_START`, end = today Oslo). Incremental covers Oslo today − 7 → tomorrow.
@@ -43,8 +43,8 @@ Verify command for every task: `ruff check . && pytest`
   - Depends on: 2
 
 ### Checkpoint A
-- [ ] `ruff check . && pytest` green
-- [ ] Manual 3-day price backfill + rerun check done
+- [x] `ruff check . && pytest` green
+- [x] Manual 3-day price backfill + rerun check done
 - [ ] Human review before Phase 2
 
 ## Phase 2: Remaining sources

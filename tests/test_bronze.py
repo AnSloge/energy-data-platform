@@ -103,7 +103,7 @@ def test_http_get_sends_user_agent_and_timeout(monkeypatch):
     req, timeout = calls[0]
     assert req.get_header("User-agent") == bronze.USER_AGENT
     assert timeout == 30
-    assert sleeps == []
+    assert sleeps == [bronze.POLITE_DELAY]
 
 
 @pytest.mark.parametrize(
@@ -120,7 +120,7 @@ def test_http_get_retries_transient_errors(monkeypatch, error):
     calls, sleeps = fake_urlopen(monkeypatch, error, b"[1]")
     assert bronze.http_get(URL) == b"[1]"
     assert len(calls) == 2
-    assert sleeps == [1]
+    assert sleeps == [bronze.POLITE_DELAY, 1]
 
 
 def test_http_get_gives_up_after_three_retries(monkeypatch):
@@ -128,7 +128,7 @@ def test_http_get_gives_up_after_three_retries(monkeypatch):
     with pytest.raises(urllib.error.HTTPError):
         bronze.http_get(URL)
     assert len(calls) == 4
-    assert sleeps == [1, 2, 4]
+    assert sleeps == [bronze.POLITE_DELAY, 1, 2, 4]
 
 
 @pytest.mark.parametrize("missing_ok", [False, True])
@@ -136,7 +136,7 @@ def test_http_get_other_4xx_raises_at_once(monkeypatch, missing_ok):
     calls, sleeps = fake_urlopen(monkeypatch, http_error(403))
     with pytest.raises(urllib.error.HTTPError):
         bronze.http_get(URL, missing_ok=missing_ok)
-    assert (len(calls), sleeps) == (1, [])
+    assert (len(calls), sleeps) == (1, [bronze.POLITE_DELAY])
 
 
 def test_http_get_404(monkeypatch):

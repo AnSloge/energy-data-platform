@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from energy_platform.ingestion.bronze import BRONZE_ROOT, http_get, is_committed, write_bronze
@@ -18,6 +18,11 @@ PRICE_START = {
     "NO4": date(2021, 11, 1),
     "NO5": date(2021, 10, 1),
 }
+
+
+def _now() -> datetime:
+    """The clock, in one place so tests can monkeypatch it."""
+    return datetime.now(UTC)
 
 
 def ingest_prices(day: date, run_id: str, root: Path = BRONZE_ROOT) -> dict[str, str]:
