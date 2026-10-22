@@ -47,3 +47,8 @@ airflow.cfg
 .DS_Store
 Thumbs.db
 *:Zone.Identifier
+
+# Personal notes, kept local only
+docs/project-idea-&-context.md
+docs/project-summary.md
+docs/tools.md

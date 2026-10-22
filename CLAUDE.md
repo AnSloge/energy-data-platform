@@ -2,7 +2,7 @@
 
 Portfolio project: Energy Market Analytics & Forecasting Platform. It ingests Norwegian electricity prices and weather, moves them through Bronze → Silver → Gold, trains a forecasting model on Gold, and serves the output to a dashboard.
 
-- Architecture, layer responsibilities and implementation order: `docs/project-idea-&-context.md`
+- Architecture, layer responsibilities and implementation order: `docs/project-idea-&-context.md` (local only, gitignored; the public overview is `README.md`)
 - Chosen APIs, endpoints and their quirks: `docs/data-sources.md`
 
 ## Boundaries
